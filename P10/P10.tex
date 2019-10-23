@@ -1,0 +1,156 @@
+\documentclass{article}
+
+\usepackage[spanish]{babel}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage[top=30mm, bottom=40mm, left=15mm, right=15mm]{geometry}
+\usepackage{listings}
+\usepackage{subfig}
+\usepackage{color}
+\usepackage{multirow}
+\usepackage[latin1]{inputenc}
+
+\setlength{\parskip}{2mm}
+\setlength{\parindent}{0pt}
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.3,0.3,0.3}
+\definecolor{orange}{rgb}{0.8,0.4,0}
+\definecolor{mostaza}{rgb}{0.9,0.8,0.1}
+
+\lstset{ %
+  language=R,                     % the language of the code
+  basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+  numbers=left,                   % where to put the line-numbers
+  numberstyle=\tiny\color{gray},  % the style that is used for the line-numbers
+  stepnumber=1,                   % the step between two line-numbers. If it's 1, each line
+                                  % will be numbered
+  numbersep=5pt,                  % how far the line-numbers are from the code
+  backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
+  showspaces=false,               % show spaces adding particular underscores
+  showstringspaces=false,         % underline spaces within strings
+  showtabs=false,                 % show tabs within strings adding particular underscores
+  frame=single,                   % adds a frame around the code
+  rulecolor=\color{black},        % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. commens (green here))
+  tabsize=2,                      % sets default tabsize to 2 spaces
+  captionpos=b,                   % sets the caption-position to bottom
+  breaklines=true,                % sets automatic line breaking
+  breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+  title=\lstname,                 % show the filename of files included with \lstinputlisting;
+                                  % also try caption instead of title
+  keywordstyle=\color{orange},      % keyword style
+  commentstyle=\color{dkgreen},   % comment style
+  stringstyle=\color{mostaza},      % string literal style
+  escapeinside={\%*}{*)},         % if you want to add a comment within your code
+  morekeywords={*,...}            % if you want to add more keywords to the set
+} 
+
+\author{Marco Antonio Guajardo Vigil  2095}
+\title{\textbf{Pr\'actica 10: Algoritmo gen\'etico} \\ Simulaci\'on de sistemas}
+\date{09 de abril, 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducci\'on}
+El problema de la mochila (en ingl\'es: knapsack) es un problema cl\'asico de optimizaci\'on, particularmente de programaci\'on entera, en donde la tarea consiste en seleccionar un subconjunto de objetos de tal forma que ($i$) no exceda la capacidad de la mochila en t\'erminos de la suma de los pesos de los objetos incluidos, y que ($ii$) el valor total de los objetos incluidos sea el m\'aximo posible \cite{SatuP10}.
+
+Se hace uso de un algoritmo de tabulaci\'on que determina la combinaci\'on \'optima, aunque, solo sirve para pesos enteros, es de utilidad para esta pr\'actica, donde se prueba la implementaci\'on de un algoritmo gen\'etico en \texttt{R} de manera paralela. Los algoritmos gen\'eticos representan posibles soluciones de un problema en t\'erminos de un genoma. Se busca imitar la evoluci\'on permitiendo que las soluciones aleatorias de la poblaci\'on inicial puedan crear nuevas soluciones mediante dos mecanismos: la \textbf{reproducci\'on} donde dos soluciones $x$ y $y$ intercambian pedazos uno con otro, creando dos nuevas soluciones (hijos) y la \textbf{mutaci\'on} donde una soluci\'on crea una r\'eplica de s\'i misma, cambiando algunos de sus valores.
+
+\section{Objetivo}
+
+Se paraleliza el algoritmo gen\'etico y se estudia los efectos en su tiempo de ejecuci\'on con pruebas estad\'isticas y visualizaciones, variando el n\'umero de objetos en la instancia. Se generan tres instancias con diferentes reglas:
+
+\begin{enumerate}
+\item El peso y el valor de cada objeto se generan \textit{independientemente} con uns distribuci\'on normal.
+\item El pero de cada objeto se genera independientemente con una distribuci\'on normal y su valor es \textit{correlacionado} con el peso, con un ruido normalmente distribuido de baja magnitud.
+\item El peso de cada objeto se genera independientemente con una distribuci\'on normal y su valor es \textit{inversamente correlacionado} con el peso, con un ruido normalmente distribuido de baja magnitud.
+\end{enumerate}
+
+Se determina para cada uno de los tres casos a partir de qu\'e tama\~no de instancia el algoritmo gen\'etico es mejor que el algoritmo exacto en t\'erminos de valor total obtenido por segundo de ejecuci\'on.
+
+\newpage
+
+\subsection{Implementaci\'on de R}
+Para la elaboraci\'on de este experimento, se hace uso de un software libre para computaci\'on estad\'istica y gr\'aficos llamado \citet{R}, el cual nos permite realizar los c\'alculos necesarios para dicho experimento. Con \'el, se pueden controlar los datos estad\'isticos que se ocupan para dar seguimiento con la pr\'actica, se necesita graficarlos para as\'i poder compararlos mejor, ya que se maneja una cantidad de datos considerable y trabajaremos con ellos en forma estad\'istica.
+
+\subsection{Experimentaci\'on}
+
+Se establecen 50 part\'iculas para el modelo de experimentaci\'on dadas en la variable \texttt{n}, se agrega masa a las part\'iculas con una distribuci\'on normal para poder crear una fuerza gravitacional entre ellas y se normaliza para generar masas con rango $[0,1]$, para simplificar las normalizaciones requeridas para las otras variables se crea una funci\'on para ello, lo cual se observa en el c\'odigo:
+
+\begin{lstlisting}[language=R]
+n <- 50
+p <- data.frame(x = rnorm(n), y = rnorm(n), carga = rnorm(n), masa = rnorm(n))
+carga <- FALSE
+fg <- FALSE
+normalizar <- function(v){
+  max <- max(v)
+  min <- min(v)
+  V <- (v - min) / (max - min)
+  return(V)
+}
+p$x <- normalizar(p$x) # ahora son de 0 a 1
+p$y <- normalizar(p$y) # las y tambien
+p$masa <- normalizar(p$masa) # la masa es de 0 a 1
+cargamax <- max(p$c)
+cargamin <- min(p$c)
+p$carga <- 2 * (p$carga - cargamin) / (cargamax - cargamin) - 1 # cargas son entre -1 y 1
+\end{lstlisting}
+
+Se crea la fuerza de atracci\'on gravitacional $F$ siguiendo la f\'ormula \eqref{F}:
+
+\begin{equation}
+F = G \times \frac{m_{1} \times m_{2}}{d^{_{2}}},
+\label{F}
+\end{equation}
+
+omitiendo su constante universal de gravitaci\'on ya que se trabaja con part\'iculas muy peque\~nas, de tal modo que esta causa un efecto en las fuerzas $f_x$ y $f_y$; donde $m_1$ es la masa de la part\'icula que se esta comparando con la de otra part\'icula $m_2$ y $d^2$ es la distancia que existe entre ellas al cuadrado. Si la masa $m_1$ es menor a la masa $m_2$ esta se vera atra\'ida por la de mayor masa ($m_2$).Se suman los dos factores que ahora influyen en las fuerzas (atracci\'on de cargas y gravitacional por sus masas) como se muestra en el c\'odigo:
+
+\newpage
+
+\begin{lstlisting}[language=R]
+fuerza <- function(i) {
+  xi <- p[i,]$x
+  yi <- p[i,]$y
+  cargai <- p[i,]$carga
+  masai <- p[i,]$masa
+  fx <- 0
+  fy <- 0
+  for (j in 1:n) {
+    cargaj <- p[j,]$carga
+    masaj <- p[j,]$masa
+    dirc <- (-1)^(1 + 1 * (cargai * cargaj < 0))
+    dirm <- (-1)^(1 + 1 * (masai < masaj))
+    dx <- xi - p[j,]$x
+    dy <- yi - p[j,]$y
+    factorc <- dirc * abs(cargai - cargaj) / (sqrt(dx^2 + dy^2) + eps)
+    factorm <- dirm * (masai * masaj) / (dx^2 + dy^2 + eps)
+    fx <- fx - dx * (factorc + factorm)
+    fy <- fy - dy * (factorc + factorm)
+  }
+  return(c(fx, fy))
+}
+\end{lstlisting}
+
+Obtenemos la velocidad sumando los $\Delta x$ y $\Delta y$ que se proporcionan para cada part\'icula en el paso del tiempo:
+
+\begin{lstlisting}[language=R]
+p$v <- foreach(i = 1:n, .combine=c) %dopar% (p[i,]$x + p[i,]$y)
+\end{lstlisting}
+
+\subsection{Resultados y conclusiones}
+
+Se creo un \texttt{gif} donde se muestra el comportamiento de las part\'iculas afectadas por la atracci\'on de cargas y la fuerza gravitacional de atracci\'on que hay entre ellas, el cual se encuentra en el repositorio de esta misma pr\'actica \cite{repo}.
+
+Como se muestra en la figura \ref{fig:resultados}, tomando en cuenta que las part\'iculas rojas son las que mayor velocidad tienen y las amarillas la menor, la velocidad de la part\'icula es mayor conforme su magnitud de carga sea m\'as neutra, entre mayor masa la velocidad se vuelve m\'as lenta ya que la part\'icula dif\'icilmente se ve atra\'ida por otras, en cambio cuando su masa es menor, estas suelen tener una velocidad m\'as alta.
+
+\newpage
+
+
+
+\bibliographystyle{plainnat}
+\bibliography{Bibliografias}
+\end{document}
